@@ -1,4 +1,5 @@
 import gspread
+import streamlit as st
 from google_auth_oauthlib.flow import InstalledAppFlow
 import pickle
 import os
@@ -11,24 +12,25 @@ SCOPES = [
 def get_client():
     creds = None
 
+    # Token cache (works per Streamlit session)
     if os.path.exists("token.pickle"):
         with open("token.pickle", "rb") as token:
             creds = pickle.load(token)
 
     if not creds or not creds.valid:
-        flow = InstalledAppFlow.from_client_secrets_file(
-            "client_secret.json",
+        flow = InstalledAppFlow.from_client_config(
+            {
+                "installed": {
+                    "client_id": st.secrets["google_oauth"]["client_id"],
+                    "client_secret": st.secrets["google_oauth"]["client_secret"],
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token"
+                }
+            },
             SCOPES
         )
 
-        # This automatically sets redirect_uri to localhost
-        creds = flow.run_local_server(
-            host="localhost",
-            port=0,  # auto-pick free port
-            authorization_prompt_message="",
-            success_message="The authentication flow has completed. You may close this window."
-        )
-
+        creds = flow.run_local_server(port=0)
 
         with open("token.pickle", "wb") as token:
             pickle.dump(creds, token)
@@ -40,7 +42,6 @@ def read_sheet(sheet_name):
     sheet = client.open(sheet_name).sheet1
     records = sheet.get_all_records()
     return records, sheet
-
 
 def update_pilot_status(sheet, pilot_id, new_status):
     records = sheet.get_all_records()
